@@ -1,0 +1,24 @@
+{
+  "name": "services-lead-automation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:trigger": "trigger dev --env-file .env",
+    "deploy:trigger": "trigger deploy --env-file .env",
+    "sync:event-feed": "node scripts/sync-resend-events.mjs",
+    "run:task:once": "node --env-file=.env --import tsx ./src/manual/trigger-once.ts",
+    "run:discovery:once": "npm run run:task:once -- smb-lead-discovery",
+    "run:sender:once": "npm run run:task:once -- smb-cold-email-sender",
+    "run:sync:once": "npm run run:task:once -- smb-outreach-event-sync",
+    "send:test:email": "node --env-file=.env --import tsx ./src/manual/send-test-template.ts"
+  },
+  "dependencies": {
+    "@trigger.dev/sdk": "^3.3.16"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "trigger.dev": "^3.3.16",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

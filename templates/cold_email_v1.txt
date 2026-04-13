@@ -1,0 +1,16 @@
+Subject: Quick automation idea for {{business_name}}
+
+Hi {{contact_name_or_owner}},
+
+I looked at {{business_name}} and noticed a few workflows that can likely be automated with AI, like lead follow-up, no-show recovery, and customer response handling.
+
+I build AI agent automations for small businesses to reduce manual work and increase booked jobs.
+
+If helpful, I can share a short 2-minute audit with 3 automation ideas specifically for {{business_name}}.
+
+Best,
+Hamza
+https://www.buildwithhamza.com/
+
+A/1-224, Capital Society, Karachi, Pakistan
+Reply with "unsubscribe" to stop receiving emails.
