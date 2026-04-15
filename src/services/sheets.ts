@@ -27,8 +27,19 @@ function base64url(input: string | Buffer): string {
 }
 
 function parseServiceAccount(): ServiceAccount {
-  const raw = requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON");
-  const parsed = JSON.parse(raw) as Partial<ServiceAccount>;
+  const raw = requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON").trim();
+  const unwrapped =
+    (raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))
+      ? raw.slice(1, -1)
+      : raw;
+
+  let parsed: Partial<ServiceAccount>;
+  try {
+    parsed = JSON.parse(unwrapped) as Partial<ServiceAccount>;
+  } catch (error) {
+    throw new Error(`GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON: ${String((error as Error).message ?? error)}`);
+  }
+
   if (!parsed.client_email || !parsed.private_key) {
     throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON must include client_email and private_key");
   }

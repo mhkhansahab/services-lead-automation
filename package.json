@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:trigger": "trigger dev --env-file .env",
-    "deploy:trigger": "trigger deploy --env-file .env",
+    "dev:trigger": "npx trigger.dev@latest dev --env-file .env",
+    "deploy:trigger": "npx trigger.dev@latest deploy --env-file .env",
     "sync:event-feed": "node scripts/sync-resend-events.mjs",
     "run:task:once": "node --env-file=.env --import tsx ./src/manual/trigger-once.ts",
     "run:discovery:once": "npm run run:task:once -- smb-lead-discovery",
