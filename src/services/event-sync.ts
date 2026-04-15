@@ -22,11 +22,21 @@ type Counters = {
   outreachUpdates: number;
 };
 
+function isMissingEventSyncRunsTable(error: unknown): boolean {
+  const message = String((error as Error)?.message ?? error);
+  return message.includes("PGRST205") && message.includes("event_sync_runs");
+}
+
 async function latestSyncCutoff(): Promise<string | null> {
-  const rows = await sbSelect<{ run_started_at: string }>(
-    "event_sync_runs?select=run_started_at&order=run_started_at.desc&limit=1"
-  );
-  return rows[0]?.run_started_at ?? null;
+  try {
+    const rows = await sbSelect<{ run_started_at: string }>(
+      "event_sync_runs?select=run_started_at&order=run_started_at.desc&limit=1"
+    );
+    return rows[0]?.run_started_at ?? null;
+  } catch (error) {
+    if (isMissingEventSyncRunsTable(error)) return null;
+    throw error;
+  }
 }
 
 async function resolveRowsByRecipient(
@@ -64,6 +74,8 @@ async function upsertSuppression(email: string | null, businessId: string, reaso
 export async function runEventSync() {
   const startedAt = new Date().toISOString();
   const cutoff = await latestSyncCutoff();
+  const warnings: string[] = [];
+  let sheetUpdatedCount = 0;
 
   const [outreachRows, contacts, businesses] = await Promise.all([
     sbSelect<OutreachRow>("outreach?select=id,business_id,contact_id,status,provider_message_id"),
@@ -153,35 +165,49 @@ export async function runEventSync() {
   }
 
   const finishedAt = new Date().toISOString();
-  await appendSyncLogRow([
-    finishedAt,
-    counters.deliveries,
-    counters.bounces,
-    counters.replies,
-    counters.suppressions,
-    counters.outreachUpdates,
-    failures.length
-  ]);
+  try {
+    await appendSyncLogRow([
+      finishedAt,
+      counters.deliveries,
+      counters.bounces,
+      counters.replies,
+      counters.suppressions,
+      counters.outreachUpdates,
+      failures.length
+    ]);
+    sheetUpdatedCount = 1;
+  } catch (error) {
+    warnings.push(`Google Sheets sync skipped: ${String((error as Error).message ?? error)}`);
+  }
 
-  await sbInsert("event_sync_runs", {
-    source: "resend",
-    run_started_at: startedAt,
-    run_finished_at: finishedAt,
-    delivery_count: counters.deliveries,
-    bounce_count: counters.bounces,
-    reply_count: counters.replies,
-    suppression_count: counters.suppressions,
-    outreach_updated_count: counters.outreachUpdates,
-    sheet_updated_count: 1,
-    failed_updates_count: failures.length,
-    failure_details: failures,
-    notes: cutoff ? `Incremental sync after ${cutoff}` : "Initial sync"
-  });
+  try {
+    await sbInsert("event_sync_runs", {
+      source: "resend",
+      run_started_at: startedAt,
+      run_finished_at: finishedAt,
+      delivery_count: counters.deliveries,
+      bounce_count: counters.bounces,
+      reply_count: counters.replies,
+      suppression_count: counters.suppressions,
+      outreach_updated_count: counters.outreachUpdates,
+      sheet_updated_count: sheetUpdatedCount,
+      failed_updates_count: failures.length,
+      failure_details: failures,
+      notes: cutoff ? `Incremental sync after ${cutoff}` : "Initial sync"
+    });
+  } catch (error) {
+    if (isMissingEventSyncRunsTable(error)) {
+      warnings.push("event_sync_runs table not found; skipped sync-run log insert");
+    } else {
+      throw error;
+    }
+  }
 
   return {
     startedAt,
     finishedAt,
     counters,
-    failures
+    failures,
+    warnings
   };
 }

@@ -6,6 +6,18 @@ type ServiceAccount = {
   private_key: string;
 };
 
+function normalizePrivateKey(value: string): string {
+  let key = String(value ?? "").trim();
+
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    key = key.slice(1, -1);
+  }
+
+  // Common .env encoding issue: PEM newlines are escaped as literal "\n".
+  key = key.replace(/\\n/g, "\n");
+  return key;
+}
+
 function base64url(input: string | Buffer): string {
   return Buffer.from(input)
     .toString("base64")
@@ -20,7 +32,16 @@ function parseServiceAccount(): ServiceAccount {
   if (!parsed.client_email || !parsed.private_key) {
     throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON must include client_email and private_key");
   }
-  return parsed as ServiceAccount;
+
+  const privateKey = normalizePrivateKey(parsed.private_key);
+  if (!privateKey.includes("BEGIN PRIVATE KEY")) {
+    throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON.private_key is not a valid PEM private key");
+  }
+
+  return {
+    client_email: parsed.client_email,
+    private_key: privateKey
+  };
 }
 
 export async function googleAccessToken(): Promise<string> {
@@ -63,11 +84,8 @@ export async function googleAccessToken(): Promise<string> {
   return json.access_token;
 }
 
-export async function appendSyncLogRow(row: (string | number)[]): Promise<void> {
-  const token = await googleAccessToken();
-  const sheetId = requireEnv("GOOGLE_SHEET_ID");
-  const range = encodeURIComponent("Sync Log!A1");
-
+async function appendRowToRange(token: string, sheetId: string, rangeA1: string, row: (string | number)[]): Promise<void> {
+  const range = encodeURIComponent(rangeA1);
   const response = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
     {
@@ -83,4 +101,43 @@ export async function appendSyncLogRow(row: (string | number)[]): Promise<void> 
   if (!response.ok) {
     throw new Error(`Google Sheets append failed: ${response.status} ${await response.text()}`);
   }
+}
+
+async function firstSheetTitle(token: string, sheetId: string): Promise<string | null> {
+  const response = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties.title`,
+    {
+      headers: {
+        authorization: `Bearer ${token}`
+      }
+    }
+  );
+
+  if (!response.ok) return null;
+  const json = (await response.json()) as { sheets?: Array<{ properties?: { title?: string } }> };
+  return json.sheets?.[0]?.properties?.title ?? null;
+}
+
+export async function appendSyncLogRow(row: (string | number)[]): Promise<void> {
+  const token = await googleAccessToken();
+  const sheetId = requireEnv("GOOGLE_SHEET_ID");
+  const tabName = (process.env.GOOGLE_SHEET_TAB_NAME ?? "Sync Log").trim();
+  const escapedTab = tabName.replace(/'/g, "''");
+
+  try {
+    await appendRowToRange(token, sheetId, `'${escapedTab}'!A1`, row);
+    return;
+  } catch (error) {
+    const message = String((error as Error).message ?? error);
+    if (!message.includes("Unable to parse range")) throw error;
+  }
+
+  const fallbackTitle = await firstSheetTitle(token, sheetId);
+  if (fallbackTitle) {
+    const escapedFallback = fallbackTitle.replace(/'/g, "''");
+    await appendRowToRange(token, sheetId, `'${escapedFallback}'!A1`, row);
+    return;
+  }
+
+  throw new Error("Google Sheets append failed: invalid range and unable to resolve fallback sheet title");
 }

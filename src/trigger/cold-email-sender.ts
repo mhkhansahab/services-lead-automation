@@ -59,9 +59,8 @@ function htmlBodyFor(row: QueueRow): string {
   const businessCategory = row.business_category ? ` in ${escapeHtml(row.business_category)}` : "";
   const senderName = escapeHtml(requireEnv("EMAIL_FROM_NAME"));
   const businessAddress = escapeHtml(requireEnv("BUSINESS_ADDRESS"));
-  const avatarUrl = "https://www.buildwithhamza.com/assets/profile/avatar-2.svg";
-  const avatarPngFallbackUrl =
-    "https://ui-avatars.com/api/?name=Hamza+Khan&background=93c5fd&color=0a0a0a&size=64&format=png";
+  const avatarLightUrl = "https://buildwithhamza.com/assets/profile/avatar-light.png";
+  const avatarDarkUrl = "https://buildwithhamza.com/assets/profile/avatar-dark.png";
   const bookingUrl = "https://calendly.com/hamza-khansahab/30min";
   const safeBookingUrl = escapeHtml(bookingUrl);
 
@@ -70,6 +69,16 @@ function htmlBodyFor(row: QueueRow): string {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="supported-color-schemes" content="light dark" />
+    <style>
+      .avatar-light { display: block !important; }
+      .avatar-dark { display: none !important; }
+      @media (prefers-color-scheme: dark) {
+        .avatar-light { display: none !important; }
+        .avatar-dark { display: block !important; }
+      }
+    </style>
     <title>${businessName}</title>
   </head>
   <body style="margin:0;padding:0;background:#fafafa;font-family:Inter,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#18181b;">
@@ -85,7 +94,8 @@ function htmlBodyFor(row: QueueRow): string {
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                   <tr>
                     <td style="vertical-align:middle;">
-                      <img src="${avatarUrl}" width="26" height="26" alt="${senderName}" onerror="this.onerror=null;this.src='${avatarPngFallbackUrl}';" style="display:block;width:26px;height:26px;border-radius:8px;background:#93c5fd;border:1px solid #d4d4d8;" />
+                      <img src="${avatarLightUrl}" width="26" height="26" alt="${senderName}" class="avatar-light" style="display:block;width:26px;height:26px;border-radius:8px;background:#93c5fd;border:1px solid #d4d4d8;" />
+                      <img src="${avatarDarkUrl}" width="26" height="26" alt="${senderName}" class="avatar-dark" style="display:none;width:26px;height:26px;border-radius:8px;background:#18181b;border:1px solid #3f3f46;" />
                     </td>
                     <td style="padding-left:9px;vertical-align:middle;">
                       <p style="margin:0;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#71717a;font-weight:600;">${senderName}</p>
@@ -168,9 +178,9 @@ async function businessAlreadyContacted(businessId: string): Promise<boolean> {
 
 export const smbColdEmailSender = schedules.task({
   id: "smb-cold-email-sender",
-  cron: { pattern: "0 9 * * *", timezone: "America/New_York" },
+  cron: { pattern: "0 10 * * 1-5", timezone: "America/New_York" },
   run: async () => {
-    const dailyLimit = envNumber("DAILY_SEND_LIMIT", 15);
+    const dailyLimit = envNumber("DAILY_SEND_LIMIT", 10);
     const fromAddress = requireEnv("EMAIL_FROM_ADDRESS");
     const replyTo = requireEnv("EMAIL_REPLY_TO");
     const fromName = requireEnv("EMAIL_FROM_NAME");

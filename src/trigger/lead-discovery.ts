@@ -47,7 +47,7 @@ async function alreadyContacted(businessId: string): Promise<boolean> {
 
 export const smbLeadDiscovery = schedules.task({
   id: "smb-lead-discovery",
-  cron: { pattern: "0 */6 * * *", timezone: "America/New_York" },
+  cron: { pattern: "0 0 * * *", timezone: "America/New_York" },
   run: async (payload) => {
     requireEnv("SUPABASE_URL");
     requireEnv("SUPABASE_SECRET_KEY");

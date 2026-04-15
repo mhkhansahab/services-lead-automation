@@ -3,9 +3,9 @@
 Code-first automation pipeline for US SMB lead discovery, outreach sending, and event sync.
 
 ## Included tasks
-- `smb-lead-discovery` (every 6 hours)
-- `smb-cold-email-sender` (daily at 9 AM America/New_York)
-- `smb-outreach-event-sync` (hourly)
+- `smb-lead-discovery` (daily at 12:00 AM America/New_York)
+- `smb-cold-email-sender` (10:00 AM Monday-Friday America/New_York)
+- `smb-outreach-event-sync` (daily at 12:30 AM America/New_York)
 
 ## Project structure
 - `src/trigger/*.ts`: Trigger.dev scheduled tasks

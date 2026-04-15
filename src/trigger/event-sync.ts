@@ -4,7 +4,7 @@ import { runEventSync } from "../services/event-sync";
 
 export const smbOutreachEventSync = schedules.task({
   id: "smb-outreach-event-sync",
-  cron: { pattern: "0 * * * *", timezone: "America/New_York" },
+  cron: { pattern: "30 0 * * *", timezone: "America/New_York" },
   run: async () => {
     requireEnv("SUPABASE_URL");
     requireEnv("SUPABASE_SECRET_KEY");
@@ -14,6 +14,9 @@ export const smbOutreachEventSync = schedules.task({
 
     const result = await runEventSync();
     logger.log("Event sync summary", result.counters);
+    if (result.warnings?.length) {
+      logger.warn("Event sync warnings", { warnings: result.warnings });
+    }
     return result;
   }
 });

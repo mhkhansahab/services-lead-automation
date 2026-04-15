@@ -3,6 +3,16 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="supported-color-schemes" content="light dark" />
+    <style>
+      .avatar-light { display: block !important; }
+      .avatar-dark { display: none !important; }
+      @media (prefers-color-scheme: dark) {
+        .avatar-light { display: none !important; }
+        .avatar-dark { display: block !important; }
+      }
+    </style>
     <title>{{business_name}}</title>
   </head>
   <body style="margin:0;padding:0;background:#fafafa;font-family:Inter,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#18181b;">
@@ -18,7 +28,8 @@
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                   <tr>
                     <td style="vertical-align:middle;">
-                      <img src="https://www.buildwithhamza.com/assets/profile/avatar-2.svg" width="26" height="26" alt="Hamza" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=Hamza+Khan&background=93c5fd&color=0a0a0a&size=64&format=png';" style="display:block;width:26px;height:26px;border-radius:8px;background:#93c5fd;border:1px solid #d4d4d8;" />
+                      <img src="https://buildwithhamza.com/assets/profile/avatar-light.png" width="26" height="26" alt="Hamza" class="avatar-light" style="display:block;width:26px;height:26px;border-radius:8px;background:#93c5fd;border:1px solid #d4d4d8;" />
+                      <img src="https://buildwithhamza.com/assets/profile/avatar-dark.png" width="26" height="26" alt="Hamza" class="avatar-dark" style="display:none;width:26px;height:26px;border-radius:8px;background:#18181b;border:1px solid #3f3f46;" />
                     </td>
                     <td style="padding-left:9px;vertical-align:middle;">
                       <p style="margin:0;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#71717a;font-weight:600;">Hamza</p>
