@@ -1,6 +1,6 @@
 import { appendSyncLogRow } from "./sheets";
 import { listEmails } from "./resend";
-import { sbInsert, sbSelect, sbUpdate, sbUpsert } from "./supabase";
+import { sbInsert, sbSelect, sbUpdate } from "./supabase";
 import { extractDomain, normalizeEmail, normalizeText } from "../lib/utils";
 
 type OutreachRow = {
@@ -13,6 +13,13 @@ type OutreachRow = {
 
 type ContactRow = { id: string; email: string | null };
 type BusinessRow = { id: string; domain: string | null };
+type SuppressionRow = {
+  id: string;
+  email: string | null;
+  domain: string | null;
+  business_id: string | null;
+  reason: string;
+};
 
 type Counters = {
   deliveries: number;
@@ -56,19 +63,50 @@ async function resolveRowsByRecipient(
 }
 
 async function upsertSuppression(email: string | null, businessId: string, reason: "replied" | "hard_bounce") {
-  const domain = extractDomain(email);
-  if (!email && !domain) return;
+  const normalizedEmail = normalizeEmail(email);
+  const domain = extractDomain(normalizedEmail);
+  if (!normalizedEmail && !domain) return;
 
-  await sbUpsert(
-    "suppression_list",
-    {
-      email,
-      domain,
-      business_id: businessId,
-      reason
-    },
-    email ? "email" : "domain"
-  );
+  const selectFields = "id,email,domain,business_id,reason";
+
+  if (normalizedEmail) {
+    const rows = await sbSelect<SuppressionRow>(
+      `suppression_list?select=${selectFields}&email=eq.${encodeURIComponent(normalizedEmail)}&limit=1`
+    );
+    const existing = rows[0];
+    if (existing) {
+      await sbUpdate(`suppression_list?id=eq.${existing.id}`, {
+        email: normalizedEmail,
+        domain,
+        business_id: businessId,
+        reason
+      });
+      return;
+    }
+  }
+
+  if (domain) {
+    const rows = await sbSelect<SuppressionRow>(
+      `suppression_list?select=${selectFields}&domain=eq.${encodeURIComponent(domain)}&limit=1`
+    );
+    const existing = rows[0];
+    if (existing) {
+      await sbUpdate(`suppression_list?id=eq.${existing.id}`, {
+        email: normalizedEmail || existing.email,
+        domain,
+        business_id: businessId,
+        reason
+      });
+      return;
+    }
+  }
+
+  await sbInsert("suppression_list", {
+    email: normalizedEmail || null,
+    domain,
+    business_id: businessId,
+    reason
+  });
 }
 
 export async function runEventSync() {
