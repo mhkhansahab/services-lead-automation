@@ -197,13 +197,92 @@ async function findOutreachByEmail(email) {
   });
 }
 
-async function insertSuppression(record) {
+async function findSuppressionByEmail(email) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return null;
+
+  const response = await supabaseFetch(
+    `suppression_list?select=id,email,domain,business_id,reason&email=eq.${encodeURIComponent(normalized)}&limit=1`,
+  );
+  if (!response.ok) {
+    throw new Error(`Suppression lookup by email failed: ${response.status} ${await response.text()}`);
+  }
+
+  const rows = await response.json();
+  return rows[0] || null;
+}
+
+async function findSuppressionByDomain(domain) {
+  const normalized = normalizeEmail(domain);
+  if (!normalized) return null;
+
+  const response = await supabaseFetch(
+    `suppression_list?select=id,email,domain,business_id,reason&domain=eq.${encodeURIComponent(normalized)}&limit=1`,
+  );
+  if (!response.ok) {
+    throw new Error(`Suppression lookup by domain failed: ${response.status} ${await response.text()}`);
+  }
+
+  const rows = await response.json();
+  return rows[0] || null;
+}
+
+async function upsertSuppression(record) {
+  const email = normalizeEmail(record.email);
+  const domain = extractDomain(email || record.domain);
+  if (!email && !domain) return;
+
+  const existingByEmail = await findSuppressionByEmail(email);
+  if (existingByEmail) {
+    const response = await supabaseFetch(`suppression_list?id=eq.${existingByEmail.id}`, {
+      method: 'PATCH',
+      headers: {
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify({
+        email,
+        domain,
+        business_id: record.business_id,
+        reason: record.reason,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Suppression update by email failed: ${response.status} ${await response.text()}`);
+    }
+    return response.json();
+  }
+
+  const existingByDomain = domain ? await findSuppressionByDomain(domain) : null;
+  if (existingByDomain) {
+    const response = await supabaseFetch(`suppression_list?id=eq.${existingByDomain.id}`, {
+      method: 'PATCH',
+      headers: {
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify({
+        email: email || existingByDomain.email,
+        domain,
+        business_id: record.business_id,
+        reason: record.reason,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Suppression update by domain failed: ${response.status} ${await response.text()}`);
+    }
+    return response.json();
+  }
+
   const response = await supabaseFetch('suppression_list', {
     method: 'POST',
     headers: {
-      Prefer: 'resolution=ignore-duplicates,return=representation',
+      Prefer: 'return=representation',
     },
-    body: JSON.stringify(record),
+    body: JSON.stringify({
+      email: email || null,
+      domain,
+      business_id: record.business_id,
+      reason: record.reason,
+    }),
   });
   if (!response.ok) {
     throw new Error(`Suppression insert failed: ${response.status} ${await response.text()}`);
@@ -282,7 +361,7 @@ async function processEmailSnapshot(email, counters, failures) {
       next.status = 'replied';
       next.replied_at = timestamp;
       counters.replies += 1;
-      await insertSuppression({
+      await upsertSuppression({
         email: primaryRecipient,
         domain: extractDomain(primaryRecipient),
         business_id: row.business_id,
@@ -293,7 +372,7 @@ async function processEmailSnapshot(email, counters, failures) {
       next.status = 'bounced';
       next.bounced_at = timestamp;
       counters.bounces += 1;
-      await insertSuppression({
+      await upsertSuppression({
         email: primaryRecipient,
         domain: extractDomain(primaryRecipient),
         business_id: row.business_id,
@@ -334,7 +413,7 @@ async function processReplyContent(event, counters, failures) {
     if (suppress) {
       next.status = 'unsubscribed';
       next.unsubscribed_at = timestamp;
-      await insertSuppression({
+      await upsertSuppression({
         email: sender,
         domain: extractDomain(sender),
         business_id: row.business_id,
@@ -342,7 +421,7 @@ async function processReplyContent(event, counters, failures) {
       });
       counters.suppressions += 1;
     } else {
-      await insertSuppression({
+      await upsertSuppression({
         email: sender,
         domain: extractDomain(sender),
         business_id: row.business_id,
